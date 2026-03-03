@@ -31,51 +31,47 @@ Timing variances were a nuisance. Timing is controlled at various places:
 - read_multiple_responses() in manualparamiko/transport.py (has both a timeout between responses and total timeout -in case of multiple responses- argument). 
 - Timeout based on the type of message can be set in the individual read_multiple_responses-calls.
 
-# Orchestration
+# Orchestration (Quick Start)
 
-Since the components were containerized to make it easy to run and not worry about missing dependencies.
+The easiest way to run SSH-Fuzzer is via Docker, which handles all dependencies for the Learner, Mapper, and the SUT (System Under Test).
 
-The Mapper and Learner have their Dockerfiles in their own directories. The ssh servers, dropbear and openssh, have their dockerfiles sitting in the `experiments/orchestration/dockerfiles` directory.
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
 
-In order to start learning most of the setup has been orchestrated with the help of the docker-compose files. All the learners have volume mappings so the learner outputs are available on the host machine. If you need to change or add any extra arguments for any learner or the mapper, you will have to edit the corresponding compose file.
+### Running an Experiment
+A helper script is provided to automate SSH key generation, container building, and execution.
 
-There is a script to simplify the starting of the learning setup where the `ssh-key` pair is also generated which can be used by the mapper. The containers are built locally and then the learning starts.
+1.  **Navigate to the scripts directory:**
+    ```bash
+    cd experiments/scripts
+    ```
+2.  **Start the learning process:**
+    ```bash
+    ./start_learning.sh <SUT> [ALGORITHM]
+    ```
 
+### Usage Details
+The `start_learning.sh` script accepts the following parameters:
 
-`cd experiments/scripts`
+*   **`<SUT>` (Required):** The target SSH server implementation. 
+    *   Options: `openssh7`, `openssh8`, `dropbear`.
+*   **`[ALGORITHM]` (Optional):** Specifies a Register Automata (RA) algorithm. If provided, the fuzzer runs in RA mode.
+    *   Options: `RALAMBDA`, `RASTAR`.
 
-`./start_learning.sh`
+**Examples:**
+*   **Standard Mealy Learning:** `./start_learning.sh openssh8`
+*   **Register Automata Learning:** `./start_learning.sh dropbear RALAMBDA`
 
-<code>
-Usage:
-  ./start_learning.sh <SUT>
-  ./start_learning.sh <SUT> <learning_algorithm>
+### Results and Outputs
+Learning results (Mealy machine models, logs, and statistics) are mapped from the containers back to your host machine:
 
-  <SUT>          : Required. The SSH server to experiment with.
-                        Must be one of: 'openssh7', 'openssh8', 'dropbear'.
-  <learning_algorithm> : Optional. Specifies the Register Automata (RA) learning algorithm.
-                        If provided, RA learning mode is activated.
-                        Known algorithms: RALAMBDA RASTAR. Ignored if not applicable.
+*   **Mealy (Dropbear):** `experiments/orchestration/learner_output_dropbear`
+*   **Mealy (OpenSSH 7):** `experiments/orchestration/learner_output_openssh7`
+*   **RA (Dropbear):** `experiments/orchestration/learner_output_ra_dropbear`
+*   **RA (OpenSSH 7):** `experiments/orchestration/learner_output_openssh7_ra`
 
-Examples:
-Mealy Learning:
-./start_learning.sh openssh8
-./start_learning.sh dropbear
-
-RA Learning:
-./start_learning.sh dropbear RALAMBDA
-./start_learning.sh openssh8 RASTAR
-</code>
-
-Whichever learner setup is run, based on the docker-compose file, the results will be generated in the volume mapped in each file, for instance:
-
-<u>Mealy learning dropbear:</u> `experiments/orchestration/learner_output_dropbear`
-
-<u>Mealy learning openssh7:</u> `experiments/orchestration/learner_output_openssh7`
-
-<u>RA learning dropbear:</u> `experiments/orchestration/learner_output_ra_dropbear`
-
-<u>RA learning openssh7:</u> `experiments/orchestration/learner_output_openssh7_ra`
+> **Note:** To modify specific Learner or Mapper arguments (e.g., timeouts, alphabet settings), edit the corresponding `.yaml` files in `experiments/orchestration/`.
 
 
 # Trimming script (mypydot)

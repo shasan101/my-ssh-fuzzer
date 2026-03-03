@@ -2182,7 +2182,7 @@ class Transport(threading.Thread, ClosingContextManager):
         self.auth_handler.private_key = manualparamiko.RSAKey.from_private_key_file(default_path)
         self.auth_handler.auth_method = 'publickey'
 #this should be changed to the username on the server
-        self.auth_handler.username = 'root' if ok else 'NOACCESS' #TODO Set username to machine specific
+        self.auth_handler.username = 'learner' if ok else 'NOACCESS' #TODO Set username to machine specific
         self.auth_handler.custom_parse_service_request()
 
         return self.read_multiple_responses()
@@ -2202,7 +2202,7 @@ class Transport(threading.Thread, ClosingContextManager):
     def fuzz_userauth_pw(self, ok):
         self.auth_handler = AuthHandler(self)
         self.auth_handler.auth_method = 'password'
-        self.auth_handler.username = 'thetelefon'
+        self.auth_handler.username = 'learner'
         if ok:
             self.auth_handler.password = 'student'  # Just an example, make sure this user/pass exists!
         else:
@@ -2214,7 +2214,7 @@ class Transport(threading.Thread, ClosingContextManager):
         self.auth_handler = AuthHandler(self)
 
         self.auth_handler.auth_method = 'none'
-        self.auth_handler.username = 'thetelefon'
+        self.auth_handler.username = 'learner'
         self.auth_handler.custom_parse_service_request()
 
         return self.read_multiple_responses()
@@ -3275,14 +3275,14 @@ class Transport(threading.Thread, ClosingContextManager):
             ):
                 pass
                 #Q? This might be un-commented 
-                # extensions = {"server-sig-algs": ",".join(self.preferred_pubkeys)}
-                # m = Message()
-                # m.add_byte(cMSG_EXT_INFO)
-                # m.add_int(len(extensions))
-                # for name, value in sorted(extensions.items()):
-                #     m.add_string(name)
-                #     m.add_string(value)
-                # self._send_message(m)
+                extensions = {"server-sig-algs": ",".join(self.preferred_pubkeys)}
+                m = Message()
+                m.add_byte(cMSG_EXT_INFO)
+                m.add_int(len(extensions))
+                for name, value in sorted(extensions.items()):
+                    m.add_string(name)
+                    m.add_string(value)
+                self._send_message(m)
             # we always expect to receive NEWKEYS now
             self._expect_packet(MSG_NEWKEYS)
         except Exception as e:

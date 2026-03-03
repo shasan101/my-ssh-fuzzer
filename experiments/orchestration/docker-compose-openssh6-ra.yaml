@@ -1,47 +1,46 @@
 version: "3.8"
 
 services:
-  openssh-server8:
+  openssh-server6-ra:
     build:
       context: .
-      dockerfile: dockerfiles/Dockerfile.openssh8
+      dockerfile: dockerfiles/Dockerfile.openssh6
     user: "1000:1000"
     networks:
-      - openssh_network8
+      - openssh_network6_ra
     volumes:
       - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
       - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
     entrypoint: ["sh", "-c", "mkdir -p /home/learner/.ssh && cp /home/learner/.ssh/id_rsa.pub /home/learner/.ssh/authorized_keys && chmod 600 /home/learner/.ssh/authorized_keys && /usr/sbin/sshd -D -e -f /home/learner/sshd_config"]
 
-  openssh-mapper8:
+  openssh-mapper6-ra:
     build:
       context: ../../ssh-mapper
       dockerfile: Dockerfile
     user: "1000:1000"
     depends_on:
-      - openssh-server8
+      - openssh-server6-ra
     networks:
-      - openssh_network8
+      - openssh_network6_ra
     volumes:
       - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
       - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
-    command: -l 0.0.0.0:8080 -s openssh-server8:2222 -c OpenSSH -f server
+    command: -l 0.0.0.0:8080 -s openssh-server6-ra:2222 -c OpenSSH -f server
 
-  openssh-learner8:
+  openssh-learner6-ra:
     build:
       context: ../../ssh-learner
       dockerfile: Dockerfile
     user: "1000:1000"
     networks:
-      - openssh_network8
+      - openssh_network6_ra
     depends_on:
-      - openssh-server8
-      - openssh-mapper8
+      - openssh-server6-ra
+      - openssh-mapper6-ra
     volumes:
-      - ./learner_output_openssh8:/app/output_folder
+      - ./learner_output_openssh6_ra_/${OUTPUT_DIR}:/app/output_folder
       - ../../ssh-learner/inputs/alphabets/servers/:/app/inputs/alphabets/servers/
-    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "openssh-mapper8:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "openssh-mapper8:8080","-debug"]
+    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.RALearnerMain", "state-fuzzer-server", "-connect", "openssh-mapper6-ra:8080", "-alphabet", "/app/inputs/alphabets/servers/ra_input.xml", "-output", "/app/output_folder", "-sshMapperAddress", "openssh-mapper6-ra:8080", "-debug", "-learningAlgorithm", "${LEARNING_ALGORITHM}", "-equivalenceAlgorithms", "IO_RANDOM_WALK", "-seed", "${SEED}"]
 
 networks:
-  openssh_network8:
-    driver: bridge
+  openssh_network6_ra: {}

@@ -1,10 +1,7 @@
-# Use a minimal base image
 FROM alpine:latest
 
-# Set Dropbear version
 ENV DROPBEAR_VERSION=2024.84
 
-# Install required dependencies
 RUN apk add --no-cache \
     build-base \
     wget \
@@ -14,8 +11,11 @@ RUN apk add --no-cache \
     musl-dev \
     util-linux \
     linux-pam-dev \
-    shadow \
-    && wget https://matt.ucc.asn.au/dropbear/releases/dropbear-${DROPBEAR_VERSION}.tar.bz2 \
+    shadow
+
+RUN adduser -D -s /bin/sh learner
+
+RUN wget https://matt.ucc.asn.au/dropbear/releases/dropbear-${DROPBEAR_VERSION}.tar.bz2 \
     && tar -xjf dropbear-${DROPBEAR_VERSION}.tar.bz2 \
     && cd dropbear-${DROPBEAR_VERSION} \
     && ./configure --disable-loginfunc --disable-shadow --disable-lastlog --disable-utmp --disable-wtmp \
@@ -25,25 +25,20 @@ RUN apk add --no-cache \
     && rm -rf dropbear-${DROPBEAR_VERSION} dropbear-${DROPBEAR_VERSION}.tar.bz2 \
     && apk del build-base wget tar
 
-
-# Create necessary directories for Dropbear
 RUN mkdir -p /etc/dropbear \
-    && mkdir -p /home/dropbearuser/.ssh \
-    && chmod 700 /home/dropbearuser/.ssh
+    && dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key \
+    && dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key \
+    && dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key
 
-# Create a non-root user
-RUN adduser -D -s /bin/sh dropbearuser
+RUN chown -R learner:learner /etc/dropbear \
+    && chmod 700 /etc/dropbear \
+    && chmod 600 /etc/dropbear/*
 
-# Generate Dropbear host keys at runtime
-RUN dropbearkey -t rsa -f /etc/dropbear/dropbear_rsa_host_key && \
-    dropbearkey -t ecdsa -f /etc/dropbear/dropbear_ecdsa_host_key && \
-    dropbearkey -t ed25519 -f /etc/dropbear/dropbear_ed25519_host_key
+USER learner
 
-# Set Dropbear server to run on port 22 (override in `docker run -p`)
+RUN mkdir -p /home/learner/.ssh \
+    && chmod 700 /home/learner/.ssh
+
 EXPOSE 22
 
-RUN mkdir ~/.ssh; chmod 700 ~/.ssh
-
-# Command to run Dropbear SSH server
-CMD ["/usr/local/sbin/dropbear", "-F", "-E", "-j", "-k", "-s"]
-
+CMD ["/usr/local/sbin/dropbear", "-F", "-E", "-s", "-p", "22", "-i"]

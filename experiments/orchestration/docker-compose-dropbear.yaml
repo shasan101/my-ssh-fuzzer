@@ -5,38 +5,33 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.dropbear
-    container_name: dropbear-ssh
-    # ports:
-    #   - "2222:22"
+    user: "1000:1000"
     networks:
       - dropbear_network
     volumes:
-      - ./ssh-keys/learner-ssh.pub:/root/.ssh/id_rsa.pub:ro
-      - ./ssh-keys/learner-ssh:/root/.ssh/id_rsa:ro
-    entrypoint: ["sh", "-c", "cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys && /usr/local/sbin/dropbear -F -E -j -k -s"]
-
+      - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
+      - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
+    entrypoint: ["sh", "-c", "mkdir -p /home/learner/.ssh && cp /home/learner/.ssh/id_rsa.pub /home/learner/.ssh/authorized_keys && chmod 600 /home/learner/.ssh/authorized_keys && /usr/local/sbin/dropbear -F -E -s -p 22 -i"]
 
   dropbear-mapper:
     build:
       context: ../../ssh-mapper
       dockerfile: Dockerfile
-    container_name: dropbear-mapper
-    # ports:
-    #   - "8080:8080"
+    user: "1000:1000"
     depends_on:
       - dropbear-ssh
     networks:
       - dropbear_network
     volumes:
-      - ./ssh-keys/learner-ssh.pub:/root/.ssh/id_rsa.pub:ro
-      - ./ssh-keys/learner-ssh:/root/.ssh/id_rsa:ro
+      - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
+      - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
     command: -l 0.0.0.0:8080 -s dropbear-ssh:22 -f server
 
   dropbear-learner:
     build:
       context: ../../ssh-learner
       dockerfile: Dockerfile
-    container_name: dropbear-learner
+    user: "1000:1000"
     networks:
       - dropbear_network
     depends_on:
@@ -45,8 +40,7 @@ services:
     volumes:
       - ./learner_output_dropbear:/app/output_folder
       - ../../ssh-learner/inputs/alphabets/servers/:/app/inputs/alphabets/servers/
-    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "dropbear-mapper:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "dropbear-mapper:8080", "-debug", "-roundLimit", "3"]
+    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "dropbear-mapper:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "dropbear-mapper:8080","-debug"]
 
 networks:
-  dropbear_network:
-    driver: bridge
+  dropbear_network: {}

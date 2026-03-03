@@ -8,6 +8,14 @@ DOCKER_COMPOSE_DIR="../orchestration"
 # Ensure the ssh-keys directory exists
 mkdir -p "${SSH_KEY_DIR}"
 
+# Generate SSH key pair if it doesn't exist
+if [[ ! -f "${SSH_KEY_DIR}/${SSH_KEY_NAME}" ]]; then
+    echo "Generating SSH key pair (${SSH_KEY_NAME})..."
+    ssh-keygen -t rsa -b 2048 -N "" -f "${SSH_KEY_DIR}/${SSH_KEY_NAME}"
+    chmod 600 "${SSH_KEY_DIR}/${SSH_KEY_NAME}"
+    chmod 644 "${SSH_KEY_DIR}/${SSH_KEY_NAME}.pub"
+fi
+
 declare -a KNOWN_RA_ALGOS=("RALAMBDA" "RASTAR")
 
 is_known_ra_algo() {
@@ -26,7 +34,7 @@ print_usage() {
     echo "  ./start_learning.sh <SUT> <learning_algorithm>"
     echo
     echo "  <SUT>          : Required. The SSH server to experiment with."
-    echo "                        Must be one of: 'openssh7', 'openssh8', 'dropbear'."
+    echo "                        Must be one of: 'openssh6', 'openssh7', 'openssh8', 'dropbear'."
     echo "  <learning_algorithm> : Optional. Specifies the Register Automata (RA) learning algorithm."
     echo "                        If provided, RA learning mode is activated."
     echo "                        Known algorithms: ${KNOWN_RA_ALGOS[*]}. Ignored if not applicable."
@@ -71,7 +79,7 @@ esac
 
 
 # Validate input and start corresponding docker-compose
-if [[ ! "${SUT}" =~ ^(openssh7|openssh8|dropbear)$ ]]; then
+if [[ ! "${SUT}" =~ ^(openssh6|openssh7|openssh8|dropbear)$ ]]; then
     echo "Error: Invalid SUT name '${SUT}'."
     print_usage
 fi
@@ -93,9 +101,11 @@ if [[ -f "${DOCKER_COMPOSE_DIR}/${COMPOSE_FILE}" ]]; then
     echo "Starting ${MODE:-mealy} learning experiment for ${SUT}..."
 
     if [[ "${MODE}" == "ra" ]]; then
-        LEARNING_ALGORITHM=${ALGO} docker compose -f "${COMPOSE_FILE}" up --build -d
+        export SEED=1
+        export RUN_ID="ra_${SEED}_$(date "+%d-%m-%y-%H-%M")"
+        LEARNING_ALGORITHM=${ALGO} OUTPUT_DIR="${RUN_ID}" docker compose -f "${COMPOSE_FILE}" -p $RUN_ID -p ${SEED} up --build
     else
-        docker compose -f "${COMPOSE_FILE}" up --build -d
+        docker compose -f "${COMPOSE_FILE}" up --build
     fi
 
     popd > /dev/null

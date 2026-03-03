@@ -1,13 +1,16 @@
-FROM ubuntu:xenial
+FROM ubuntu:trusty
 
 USER root
 
+# Install OpenSSH server and sudo
 RUN apt-get update && apt-get install -y openssh-server sudo && \
     rm -rf /var/lib/apt/lists/*
 
+# Create 'learner' user with UID 1000
 RUN useradd -m -u 1000 -s /bin/bash learner && \
     echo "learner ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
+# Create necessary directories for sshd and learner
 RUN mkdir -p /home/learner/.ssh /home/learner/etc/ssh /run/sshd && \
     chown -R learner:learner /home/learner && \
     chown root:root /run/sshd && \
@@ -16,11 +19,11 @@ RUN mkdir -p /home/learner/.ssh /home/learner/etc/ssh /run/sshd && \
 
 # Generate HOST keys (Server Identity) explicitly in the learner's directory
 RUN ssh-keygen -q -t rsa -N "" -f /home/learner/etc/ssh/ssh_host_rsa_key && \
-    ssh-keygen -q -t ecdsa -N "" -f /home/learner/etc/ssh/ssh_host_ecdsa_key && \
-    ssh-keygen -q -t ed25519 -N "" -f /home/learner/etc/ssh/ssh_host_ed25519_key && \
+    ssh-keygen -q -t dsa -N "" -f /home/learner/etc/ssh/ssh_host_dsa_key && \
     chown learner:learner /home/learner/etc/ssh/* && \
     chmod 600 /home/learner/etc/ssh/*
 
+# Switch to learner user for the rest of the build and runtime
 USER learner
 WORKDIR /home/learner
 
@@ -28,8 +31,6 @@ WORKDIR /home/learner
 RUN echo "Port 2222" > /home/learner/sshd_config && \
     echo "Protocol 2" >> /home/learner/sshd_config && \
     echo "HostKey /home/learner/etc/ssh/ssh_host_rsa_key" >> /home/learner/sshd_config && \
-    echo "HostKey /home/learner/etc/ssh/ssh_host_ecdsa_key" >> /home/learner/sshd_config && \
-    echo "HostKey /home/learner/etc/ssh/ssh_host_ed25519_key" >> /home/learner/sshd_config && \
     echo "LogLevel DEBUG3" >> /home/learner/sshd_config && \
     echo "PubkeyAuthentication yes" >> /home/learner/sshd_config && \
     echo "AuthorizedKeysFile /home/learner/.ssh/authorized_keys" >> /home/learner/sshd_config && \
@@ -37,9 +38,7 @@ RUN echo "Port 2222" > /home/learner/sshd_config && \
     echo "ChallengeResponseAuthentication no" >> /home/learner/sshd_config && \
     echo "UsePAM no" >> /home/learner/sshd_config && \
     echo "PidFile /home/learner/sshd.pid" >> /home/learner/sshd_config && \
-    echo "Subsystem sftp internal-sftp" >> /home/learner/sshd_config && \
-    echo "KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group-exchange-sha1,diffie-hellman-group14-sha1,diffie-hellman-group1-sha1" >> /home/learner/sshd_config && \
-    echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> /home/learner/sshd_config
+    echo "Subsystem sftp internal-sftp" >> /home/learner/sshd_config
 
 EXPOSE 2222
 

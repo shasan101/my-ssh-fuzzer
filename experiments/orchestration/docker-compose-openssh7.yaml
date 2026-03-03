@@ -5,38 +5,33 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile.openssh7
-    container_name: openssh-server7
-    # ports:
-    #   - "2222:22"
+    user: "1000:1000"
     networks:
       - openssh_network7
     volumes:
-      - ./ssh-keys/learner-ssh.pub:/root/.ssh/id_rsa.pub:ro
-      - ./ssh-keys/learner-ssh:/root/.ssh/id_rsa:ro
-    entrypoint: ["sh", "-c", "cat /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys && /usr/sbin/sshd -D -e"]
-
+      - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
+      - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
+    entrypoint: ["sh", "-c", "mkdir -p /home/learner/.ssh && cp /home/learner/.ssh/id_rsa.pub /home/learner/.ssh/authorized_keys && chmod 600 /home/learner/.ssh/authorized_keys && /usr/sbin/sshd -D -e -f /home/learner/sshd_config"]
 
   openssh-mapper7:
     build:
       context: ../../ssh-mapper
       dockerfile: Dockerfile
-    container_name: openssh-mapper7
-    # ports:
-    #   - "8080:8080"
+    user: "1000:1000"
     depends_on:
       - openssh-server7
     networks:
       - openssh_network7
     volumes:
-      - ./ssh-keys/learner-ssh.pub:/root/.ssh/id_rsa.pub:ro
-      - ./ssh-keys/learner-ssh:/root/.ssh/id_rsa:ro
-    command: -l 0.0.0.0:8080 -s openssh-server7:22  -c OpenSSH -f server
+      - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
+      - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
+    command: -l 0.0.0.0:8080 -s openssh-server7:2222 -c OpenSSH -f server
 
   openssh-learner7:
     build:
       context: ../../ssh-learner
       dockerfile: Dockerfile
-    container_name: openssh-learner7
+    user: "1000:1000"
     networks:
       - openssh_network7
     depends_on:
@@ -45,8 +40,7 @@ services:
     volumes:
       - ./learner_output_openssh7:/app/output_folder
       - ../../ssh-learner/inputs/alphabets/servers/:/app/inputs/alphabets/servers/
-    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "openssh-mapper7:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "openssh-mapper7:8080","-debug", "-roundLimit", "3"]
+    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "openssh-mapper7:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "openssh-mapper7:8080","-debug"]
 
 networks:
-  openssh_network7:
-    driver: bridge
+  openssh_network7: {}
