@@ -39,7 +39,7 @@ digraph g {
 	s4 -> s2 [label="NEWKEYS / NO_CONN"];
 	s4 -> s4 [label="SR_AUTH / SR_ACCEPT"];
 	s4 -> s2 [label="SR_CONN / NO_CONN"];
-	s4 -> s4 [label="UA_PK_OK / UA_FAILURE"];
+	s4 -> s4 [label="UA_PK_OK / UA_SUCCESS"];
 	s4 -> s4 [label="UA_PK_NOK / UA_FAILURE"];
 	s5 -> s2 [label="KEXINIT / NO_CONN"];
 	s5 -> s3 [label="KEX30 / KEX31+NEWKEYS"];

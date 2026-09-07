@@ -1,149 +1,50 @@
-# name: CI for ssh-mapper
-# on: [push, pull_request]
-
-# jobs:
-#   ssh-mapper-dropbear-server:
-#     if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
-#     runs-on: ubuntu-latest
-#     # strategy:
-#     #   fail-fast: true
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Start learning DropbearSSH server
-#         uses: hoverkraft-tech/compose-action@v2.0.1
-#         with:
-#           cwd: experiments/orchestration
-#           compose-file: "docker-compose-dropbear.yaml"
-#           up-flags: "--build -d"
-
-#       - name: Verify Result
-#         run: |
-#           # wait for the learning to be over
-#           while [ "$( docker container inspect -f '{{.State.Running}}' dropbear-learner )" = "true" ]; do date; echo "still learning"; sleep 5; done
-#           docker logs dropbear-ssh
-#           docker logs dropbear-mapper
-#           echo "pwd: "
-#           pwd
-#           echo "ls: "
-#           ls experiments/orchestration/learner_output_dropbear
-#           experiments/scripts/diff_hyps.sh experiments/results/servers/dropbear experiments/orchestration/learner_output_dropbear 3
-
-#   ssh-mapper-openssh7-server:
-#     if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
-#     runs-on: ubuntu-latest
-#     # strategy:
-#     #   fail-fast: true
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Start learning OpenSSH7 server
-#         run: pushd experiments/scripts/ && ./start_learning.sh openssh7 && popd
-
-#       - name: Verify Result
-#         run: |
-#           # wait for the learning to be over
-#           while [ "$( docker container inspect -f '{{.State.Running}}' openssh-learner7 )" = "true" ]; do date; echo "still learning"; sleep 5; done
-#           experiments/scripts/diff_hyps.sh experiments/results/servers/openssh7 experiments/orchestration/learner_output_openssh7 3
-
-#   ssh-mapper-openssh8-server:
-#     if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
-#     runs-on: ubuntu-latest
-#     # strategy:
-#     #   fail-fast: true
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Start learning OpenSSH8 server
-#         run: pushd experiments/scripts/ && ./start_learning.sh openssh8 && popd
-
-#       - name: Verify Result
-#         run: |
-#           # wait for the learning to be over
-#           while [ "$( docker container inspect -f '{{.State.Running}}' openssh-learner8 )" = "true" ]; do date; echo "still learning"; sleep 5; done
-#           experiments/scripts/diff_hyps.sh experiments/results/servers/openssh8 experiments/orchestration/learner_output_openssh8 2
-
 name: CI for SSH Mapper (Mealy Learning)
 on: [push, pull_request]
 
 jobs:
-  # This job performs Mealy learning for the Dropbear SSH server
+  # Bounded Mealy learning of the Dropbear SSH server, verified against a golden model.
   ssh-mapper-dropbear-mealy:
-    # Skip this job if the commit message contains 'ci skip'
+    # Skip if the commit message contains 'ci skip'
     if: ${{ !contains(github.event.head_commit.message, 'ci skip') }}
-
-    # Use the latest Ubuntu runner provided by GitHub
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        # Uses the official GitHub Action to check out your repository code
         uses: actions/checkout@v4
 
-      - name: Start learning Dropbear SSH server (Mealy Mode)
-        # Navigate to the scripts directory, execute start_learning.sh for Dropbear, then return.
-        # The start_learning.sh script handles its own pathing to the orchestration directory.
+      - name: Prepare ephemeral SSH key and output dir
+        # A throwaway key is generated per run and never committed. It is left at
+        # mode 644 so the mapper container (which runs as a non-root user) can read
+        # the mounted private key. The output dir is made world-writable so the
+        # learner container can write its hypotheses to the bind mount.
         run: |
-          echo "Changing directory to experiments/scripts/ and starting learning..."
-          pushd experiments/scripts/
-          ./start_learning.sh dropbear # 'dropbear' as the single argument triggers Mealy learning
-          popd
-          echo "Learning process initiated."
+          mkdir -p experiments/orchestration/ssh-keys
+          ssh-keygen -t rsa -b 2048 -N "" -f experiments/orchestration/ssh-keys/learner-ssh
+          chmod 644 experiments/orchestration/ssh-keys/learner-ssh
+          chmod 644 experiments/orchestration/ssh-keys/learner-ssh.pub
+          mkdir -p experiments/orchestration/learner_output_dropbear
+          chmod -R 777 experiments/orchestration/learner_output_dropbear
 
-      - name: Verify Learning Result
-        # This step waits for the learner to complete and then verifies its output.
+      - name: Run bounded Dropbear learning (Mealy, roundLimit 3)
+        # -roundLimit 3 (set in the compose learner command) stops learning after
+        # the 3rd hypothesis, so the learner exits on its own (~15 min). With
+        # --abort-on-container-exit --exit-code-from the whole stack then tears
+        # down and the step returns instead of hanging on the long-running mapper/SSH.
         run: |
-          echo "--- Verifying Learning Results ---"
+          cd experiments/orchestration
+          docker compose -f docker-compose-dropbear.yaml up --build \
+            --abort-on-container-exit --exit-code-from dropbear-learner
 
-          # IMPORTANT: We need to get the exact container ID for robust inspection.
-          # We assume the Docker Compose service for the learner is named 'learner' in your docker-compose-dropbear.yaml.
-          # The docker compose command must be run from the directory where docker-compose.yaml resides.
-          echo "Retrieving Learner Container ID..."
-          pushd experiments/orchestration/ # Temporarily change to the orchestration directory
-          # 'ps -q learner' gets the ID of the 'learner' service in the background
-          LEARNER_CONTAINER_ID=$(docker compose ps -q learner)
-          popd # Return to the repository root
+      - name: Verify learned model against golden reference
+        # Diff the first 3 hypotheses against the committed reference model.
+        run: |
+          experiments/scripts/diff_hyps.sh \
+            experiments/results/servers/dropbear \
+            experiments/orchestration/learner_output_dropbear \
+            3
 
-          if [ -z "${LEARNER_CONTAINER_ID}" ]; then
-            echo "Error: Learner container ID could not be found." >&2
-            echo "Please ensure your 'docker-compose-dropbear.yaml' has a service named 'learner' and it starts successfully." >&2
-            exit 1
-          fi
-          echo "Learner Container ID: ${LEARNER_CONTAINER_ID}"
-
-          # Wait for the learning process to be over (i.e., the container stops running)
-          echo "Waiting for learner container to stop..."
-          # The '2>/dev/null || echo "false"' part handles cases where the container might have already stopped
-          # or if 'docker inspect' fails for some other reason, preventing the script from breaking.
-          while [ "$(docker container inspect -f '{{.State.Running}}' "${LEARNER_CONTAINER_ID}" 2>/dev/null || echo "false")" = "true" ]; do
-            date # Print current date/time for progress tracking
-            echo "Still learning... (waiting for container ${LEARNER_CONTAINER_ID} to stop)"
-            sleep 5 # Wait for 5 seconds before checking again
-          done
-          echo "Learner container has stopped."
-
-          # --- Debugging Information (Essential for troubleshooting if verification fails) ---
-          echo "--- Debugging Learner Container Logs ---"
-          echo "Logs for container ${LEARNER_CONTAINER_ID}:"
-          docker logs "${LEARNER_CONTAINER_ID}" || echo "Could not retrieve logs for ${LEARNER_CONTAINER_ID} (it might have been removed)." >&2
-
-          echo "Exit Code for container ${LEARNER_CONTAINER_ID}:"
-          # Get the exit code; || true prevents this debug line from failing the step itself
-          docker inspect -f '{{.State.ExitCode}}' "${LEARNER_CONTAINER_ID}" || true
-          echo "--- End Debugging Learner Container ---"
-
-          # List contents of the output directory to verify files were generated
-          echo "Current working directory before listing output: $(pwd)"
-          echo "Listing contents of output directory: experiments/orchestration/learner_output_dropbear/"
-          # '-laR' provides long listing, all files, and recursive listing for subdirectories
-          ls -laR experiments/orchestration/learner_output_dropbear/ || { echo "Output directory not found or empty." >&2; exit 1; }
-
-          # Run the diff script to verify the generated hypothesis against a golden reference
-          echo "Running hypothesis comparison script..."
-          # This command's exit code determines the success/failure of this entire step
-          experiments/scripts/diff_hyps.sh experiments/results/servers/dropbear experiments/orchestration/learner_output_dropbear 3
-
-          echo "--- CI Verification Complete Successfully! ---"
+      - name: Show learner logs on failure
+        if: failure()
+        run: |
+          cd experiments/orchestration
+          docker compose -f docker-compose-dropbear.yaml logs --no-color || true

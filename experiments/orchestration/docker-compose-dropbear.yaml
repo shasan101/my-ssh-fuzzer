@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   dropbear-ssh:
     build:
@@ -11,7 +9,7 @@ services:
     volumes:
       - ./ssh-keys/learner-ssh.pub:/home/learner/.ssh/id_rsa.pub:ro
       - ./ssh-keys/learner-ssh:/home/learner/.ssh/id_rsa:ro
-    entrypoint: ["sh", "-c", "mkdir -p /home/learner/.ssh && cp /home/learner/.ssh/id_rsa.pub /home/learner/.ssh/authorized_keys && chmod 600 /home/learner/.ssh/authorized_keys && /usr/local/sbin/dropbear -F -E -s -p 22 -i"]
+    entrypoint: ["sh", "-c", "mkdir -p /home/learner/.ssh && cp /home/learner/.ssh/id_rsa.pub /home/learner/.ssh/authorized_keys && chmod 600 /home/learner/.ssh/authorized_keys && /usr/local/sbin/dropbear -F -E -s -p 22"]
 
   dropbear-mapper:
     build:
@@ -40,7 +38,7 @@ services:
     volumes:
       - ./learner_output_dropbear:/app/output_folder
       - ../../ssh-learner/inputs/alphabets/servers/:/app/inputs/alphabets/servers/
-    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "dropbear-mapper:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "dropbear-mapper:8080","-debug"]
+    command: ["java", "-cp", "./ssh-learner.jar:./lib/*", "learner.Main", "state-fuzzer-server", "-connect", "dropbear-mapper:8080", "-alphabet", "/app/inputs/alphabets/servers/trans_auth.xml", "-output", "/app/output_folder", "-sshMapperAddress", "dropbear-mapper:8080", "-roundLimit", "3", "-debug"]
 
 networks:
   dropbear_network: {}

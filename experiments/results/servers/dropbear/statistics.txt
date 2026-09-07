@@ -3,7 +3,7 @@ Alphabet: [KEXINIT, KEX30, NEWKEYS, SR_AUTH, SR_CONN, UA_PK_OK, UA_PK_NOK]
 
 StateFuzzerConfig Parameters
 Help: false
-Debug: false
+Debug: true
 Quiet: false
 Output Directory: /app/output_folder
 Fuzzing Client: false
@@ -52,7 +52,7 @@ Process Trigger: NEW_TEST
 Start Wait: 0
 
 SulServerConfigStandard Parameters
-Connect to: ssh-mapper:8080
+Connect to: dropbear-mapper:8080
 
 MapperConfig Parameters
 Mapper Connection Config: null
@@ -77,13 +77,13 @@ Number of learning inputs: 428
 Number of learning tests: 116
 Number of inputs up to last hypothesis: 584
 Number of tests up to last hypothesis: 130
-Time (ms) to learn model: 833275
+Time (ms) to learn model: 858943
 Counterexamples:
 CE 1:Query[ε|NEWKEYS SR_CONN NEWKEYS SR_CONN KEXINIT UA_PK_NOK NEWKEYS SR_CONN KEXINIT KEX30 SR_CONN / KEXINIT+UNIMPL NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN]
 CE 2:Query[ε|KEXINIT KEX30 NEWKEYS KEX30 UA_PK_NOK SR_CONN SR_AUTH SR_AUTH KEX30 / KEXINIT KEX31+NEWKEYS+BUFFERED NO_RESP NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN NO_CONN]
 Number of inputs when hypothesis was generated: [7, 269, 584]
 Number of tests when hypothesis was generated: [7, 81, 130]
-Time (ms) when hypothesis was generated: [13198, 334418, 833271]
+Time (ms) when hypothesis was generated: [13787, 346274, 858930]
 Number of inputs when counterexample was found: [51, 381]
 Number of tests when counterexample was found: [11, 91]
-Time (ms) when counterexample was found: [33044, 414891]
+Time (ms) when counterexample was found: [35005, 432710]
